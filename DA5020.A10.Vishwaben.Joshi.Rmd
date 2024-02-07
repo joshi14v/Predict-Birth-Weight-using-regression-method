@@ -1,0 +1,159 @@
+---
+title: "Assignment 10"
+output: html_document
+date: "2022-07-29"
+---
+Question 1: In your own words, provide a clear definition of the confidence interval and the prediction interval, and 
+state their respective significance.  
+ 
+Describe in your own words what a multiple linear regression is and why one would be used. 
+Install the openintro R package and load the library in your R environment. Use the ncbirths dataset to 
+answer the following questions 
+```{r}
+##confidence interval - Confidence intervals measure the degree of uncertainty or certainty in a sampling method. Any number of probability limits can be taken, with the most common being a 95% or 99% confidence level. Confidence intervals are conducted using statistical methods.
+## Prediction interval - The prediction interval tells you where a value will fall in the future.
+## A prediction interval captures the uncertainty around a single value. A confidence interval captures the uncertainty around the mean predicted values. Thus, a prediction interval will always be wider than a confidence interval for the same value
+## multiple linear regression are a regression model that estimates the relationship between a quantitative dependent variable and two or more independent variables using a straight line. It helps to show prediction values for the future with available past data and we can create a plot to show the multiple lines in a plot.
+##install.packages("openintro")
+library(openintro)
+ncbirths <- ncbirths
+```
+
+Question 2 - Load the data in your R environment and build a full correlation matrix ,i.e. a matrix that shows the 
+correlations between all variables. Do you detect any multicollinearity that would affect the construction 
+of a multiple regression model? Comment on the distribution of each field. Do you anticipate that there 
+are fields that may not be useful for the model? If yes, provide an example. 
+
+```{r}
+library(psych)
+head(ncbirths)
+colnames(ncbirths)
+## The ncbirths dataset have 1000 observations and 13 variables. The names of the variables are "fage", "mage", "mature", "weeks", "premie", "visits", "marital", "gained", "weight", "lowbirthweight", "gender", "habit", "whitemom". fage is the father`s 12 months of birth. mage is the mother’s 12 months of birth. Weeks are period of a being pregnant in weeks. 
+## following are the factor variables having 2-3 category.
+table(ncbirths$mature)
+table(ncbirths$premie)
+table(ncbirths$marital)
+table(ncbirths$lowbirthweight)
+table(ncbirths$gender)
+table(ncbirths$habit)
+table(ncbirths$whitemom)
+
+## We can see many NA values in the dataset 
+str(ncbirths)
+summary(ncbirths)
+
+## creating the new data with no NA to find correlational matrix. 
+library(dplyr)
+## filling the NA's with average for numbers and mode for characters.
+getmode <- function(x) { x=x[nchar(as.character((x))>0)]
+uniq <- unique(x)
+uniq[which.max(tabulate(match(x, uniq)))]
+}
+for (cols in colnames(ncbirths)) {
+  if (cols %in% names(ncbirths[,sapply(ncbirths, is.numeric)])) {
+    ncbirths<-ncbirths%>%mutate(!!cols := replace(!!rlang::sym(cols), is.na(!!rlang::sym(cols)), mean(!!rlang::sym(cols), na.rm=TRUE)))
+ }
+  else {
+
+ncbirths <- ncbirths %>% mutate(!!cols := replace(!!rlang::sym(cols), is.na(!!rlang::sym(cols)==""), getmode(!!rlang::sym(cols))))
+
+  }
+}
+head(ncbirths)
+## creating dumy variables 
+ncbirths$mature <- ifelse(ncbirths$mature == "younger mom", 1, 0)
+ncbirths$premie <- ifelse(ncbirths$premie == "full term", 1, 0)
+ncbirths$marital <- ifelse(ncbirths$marital == "not married", 1, 0)
+ncbirths$lowbirthweight <- ifelse(ncbirths$lowbirthweight == "not low", 1, 0)
+ncbirths$gender <- ifelse(ncbirths$gender == "female", 1, 0)
+ncbirths$habit <- ifelse(ncbirths$habit == "nonsmoker", 1, 0)
+ncbirths$whitemom <- ifelse(ncbirths$whitemom == "white", 1, 0)
+## new model dataframe 
+ncbirths_new <- as.data.frame(ncbirths)
+head(ncbirths_new)
+```
+
+
+
+```{r}
+library(corrplot)
+cor <- cor(ncbirths_new)
+cor
+pairs(ncbirths_new)
+pairs.panels(ncbirths_new)
+
+## plotting correlational matrix
+corrplot(cor, method = "circle", order = "hclust")
+
+## observation -  1. significance of coefficient p < 0.05 2. f statistics - for overall model whether have sufficiant data and statistically alright, 3. R2 which tells model fits training data set, 4.validation of testing dataset = MSE AND MAD comparing it to other models
+```
+Question 3 Build a full multiple regression model that predicts the birth weight i.e weight. Comment on the: R- 
+squared, Standard Error, F-Statistic, p-values of coefficients. 
+```{r}
+library(car)
+model <- lm(weight~. ,  data = ncbirths_new, singular.ok = TRUE)
+vif(model)
+regmodel <- lm(weight~. , data = ncbirths_new )
+summary(regmodel)
+## R-squared - multiple r-squared value indicates 0.641 while after correction the adjusted r-squared indicates 0.6366.
+## standard error is 0.9096 on 987 degrees of freedom. 
+## The F statistic is 146.8 on 12 and 987 DF, indicats the model with weight variables fits the data better. 
+## If the p-value is 2.2e16 (p-value 0.05), the F statistic indicates that the predictor (weight) is strongly associated with the outcome variable.
+
+```
+Question 4 - Build a multiple regression model in which all coefficients are significant — use stepwise elimination 
+based on coefficients with the p-value > 0.05. Show each step as you eliminate the coefficients and clearly 
+state the reason for their elimination. At each step, determine if the model is improving. 
+```{r}
+## Building a multiple regression 
+reg_model_1 <- lm(weight ~ fage + mage + mature + weeks + premie + visits + marital + gained + lowbirthweight + gender + habit + whitemom, data = ncbirths_new)
+summary(reg_model_1)
+## Remove premie as it has highest p-value.
+reg_model_2 <- lm(weight ~ fage + mage + mature + weeks + visits + marital + gained + lowbirthweight + gender + habit + whitemom, data = ncbirths_new)
+## When the variable premie is gone, the RSE is decreasing and the F statistic is increasing, indicating that the model is improving.
+summary(reg_model_2)
+## Remove mature variable as it has highest p-value, and create new model to improve the model.
+reg_model_3 <- lm(weight ~ fage + mage + weeks + visits + marital + gained + lowbirthweight + gender + habit + whitemom, data = ncbirths_new)
+summary(reg_model_3)
+## Remove visit variable as it has highest p-value.
+reg_model_4 <- lm(weight ~ fage + mage + weeks  + marital + gained + lowbirthweight + gender + habit + whitemom, data = ncbirths_new)
+summary(reg_model_4)
+## Remove highest p-value variable mage
+reg_model_5 <- lm(weight ~ fage + weeks  + marital + gained + lowbirthweight + gender + habit + whitemom, data = ncbirths_new)
+summary(reg_model_5)
+## Remove marital variable as it has highest p-value
+reg_model_6 <- lm(weight ~ fage + weeks + gained + lowbirthweight + gender + habit + whitemom, data = ncbirths_new)
+summary(reg_model_6)
+## The Reg model 6 has a p-value of 0.05, an RSE of 0.9086 with 992 degrees of freedom, a multiple Rsquared of 0.6399, an adjusted Rsquared of 0.6374 and an F statistic of 251.9 with 7 and 992 degrees of freedom,.
+plot(reg_model_6)
+## 667, 751 and 722 are outliers. chart shows fitted values, theoretical quantiles. 
+```
+Question 5 - Use the following data to predict the birth weight using the final model from question 4 above: fage = 40, 
+mage = 32, mature = 'mature mom’, weeks = 42, premie = 'full term’, visits = 12, marital = ‘married', 
+gained=22, lowbirthweight = 'not low’, gender = ‘female', habit = ‘nonsmoker', whitemom = ‘white’. 
+After which, derive the 95% confidence and prediction intervals for the forecasted birth weight. Comment 
+on the results. 
+```{r}
+## Creating data frame.
+ncbirths_final <- data.frame(fage = 40, mage = 32, mature = 0, weeks = 42, premie = 1, visits = 12, marital = 0, gained = 22, lowbirthweight = 1, gender = 1, habit = 1, whitemom = 1)
+reg_final <- lm(weight ~ fage + weeks + gained + lowbirthweight + gender + habit + whitemom, data = ncbirths_new)
+summary(reg_final)
+prediction <- predict(reg_final, ncbirths_final)
+prediction
+v <- predict(reg_final, ncbirths_final, se.fit = TRUE)
+v
+a <- 0.95
+Qt <- c(-1,1)* qt((1- a)/2, v$df, lower.tail = FALSE)
+## Deriving the 95% confidence intervals for forecasted birth weight.
+C_interval <- v$fit + outer(v$se.fit, Qt)
+colnames(C_interval) <- c("lwr", "upr")
+C_interval
+## Deriving the 95% prediction intervals for forecasted birth weight.
+se.PI <- sqrt(v$se.fit ^ 2 + v$residual.scale ^ 2)
+P_interval <- v$fit + outer(se.PI, Qt)
+colnames(P_interval) <- c("lwr", "upr")
+P_interval
+
+##  The 95% confidence interval is between 7.916266 and 8.217054. The 95% prediction intervals for this model are 6.277374 and 9.855946.
+```
+
